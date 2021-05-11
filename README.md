@@ -50,7 +50,7 @@ Go to your Auth0 dashboard, click on the *Applications* menu on the left and the
 
 The *Create Application* button will start a wizard to define the configuration of a our application. Pick a name for your web application, and select the option *Regular Web Applications*. Do not confuse your application with Single Page Web Applications. Even we are going to implement an SPA with React, we will rely on the .NET Core Backend for negotiating access tokens. When choosing *Regular Web Applications*, we are telling Auth0 that our application will use the Authorization Code Flow that requires a backend channel to receive the initial access code for OpenID Connect, and that is exactly what we need to get that magic happening in our .NET Core backend.
 
- ![alt](./images/4_create_application.png)
+ ![alt](./images/4_create_applications.png)
 
 Once the application is created, go to the *Settings* tab and take not of the following settings, 
 
