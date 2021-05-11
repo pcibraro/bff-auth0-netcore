@@ -22,7 +22,7 @@ Visual Studio ships with three templates SPAs with a .NET Core backend. Those ar
 
 > Available templates for SPA and .NET Core
 
-![alt](./images/1-Visual Studio Templates.png)
+![alt](./images/1_visual_Studio_templates.png)
 
 As part of this article, we will be using how to implement this pattern with the ASP.NET Core with React.js template.
 
@@ -30,7 +30,7 @@ As part of this article, we will be using how to implement this pattern with the
 
 Projects created with that template from Visual Studio will have the following structure.
 
-![alt](./images/2-Project Structure.png)
+![alt](./images/2_project_structure.png)
 
 - ClientApp, this folder contains a sample SPA implemented with React.js. This is the app that we will modify to support the BBF pattern.
 - Controllers, this folder contains the controllers implemented with ASP.NET Core for the API consumed from the SPA. On other words, it's the backend.
@@ -46,11 +46,11 @@ Before modifying any code, we will proceed to configure first our application in
 The first thing we will do is to create a new brand application in the Auth0 dashboard. An application is an entry point for getting the keys and endpoints we will need in our web application.
 Go to your Auth0 dashboard, click on the *Applications* menu on the left and then *Create Application*.
 
-![alt](./images/3-Applications.png)
+![alt](./images/3_applications.png)
 
 The *Create Application* button will start a wizard to define the configuration of a our application. Pick a name for your web application, and select the option *Regular Web Applications*. Do not confuse your application with Single Page Web Applications. Even we are going to implement an SPA with React, we will rely on the .NET Core Backend for negotiating access tokens. When choosing *Regular Web Applications*, we are telling Auth0 that our application will use the Authorization Code Flow that requires a backend channel to receive the initial access code for OpenID Connect, and that is exactly what we need to get that magic happening in our .NET Core backend.
 
- ![alt](./images/4-Create Application.png)
+ ![alt](./images/4_create_application.png)
 
 Once the application is created, go to the *Settings* tab and take not of the following settings, 
 
@@ -58,7 +58,7 @@ Once the application is created, go to the *Settings* tab and take not of the fo
 - Client ID 
 - Client Secret
 
-![alt](./images/5-Application Settings.png)
+![alt](./images/5_application_settings.png)
 
 Those are the ones you will need to configure the OpenID middleware in the web application.
 
@@ -459,7 +459,7 @@ export const User = () => {
 
 From Visual Studio, click on the Run button but select your project name from the dropdown option instead of "IIS Express". That will run the application using the Kestrel, the built-in web server included in .NET Core. Kestrel runs on "https://localhost:5001", which is the URL we previously configured in Auth0.
 
-![alt](./images/6-Run Application.png)
+![alt](./images/6_run_application.png)
 
 #### About the login flow
 
