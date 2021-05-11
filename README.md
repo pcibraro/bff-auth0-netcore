@@ -22,7 +22,7 @@ Visual Studio ships with three templates SPAs with a .NET Core backend. Those ar
 
 > Available templates for SPA and .NET Core
 
-![alt](./images/1_visual_Studio_templates.png)
+![alt](./images/1_visualstudio_templates.png)
 
 As part of this article, we will be using how to implement this pattern with the ASP.NET Core with React.js template.
 
