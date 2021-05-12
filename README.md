@@ -474,3 +474,7 @@ From Visual Studio, click on the Run button but select your project name from th
 - The OIDC middleware returns a successful authentication response and a cookie which indicates that the user is authenticated. The cookie contains claims with the user's information. The cookie is stored, so that the cookie middleware will automatically authenticate the user on any future requests. The OIDC middleware receives no more requests, unless it is explicitly challenged
 - The React application uses the Auth Context to issue an API call to the getUser API. This API returns the user claims from the authentication cookie
 - The React application renders the UI Component using the authenticated user's identity.
+
+## Conclusion
+
+The BBF pattern is an ideal solution for authentication if you can afford to pay some extra money for having a dedicated backend. It will help you avoid some headches when dealing with access tokens and how to keep them safe on your client side application.
