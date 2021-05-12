@@ -477,4 +477,4 @@ From Visual Studio, click on the Run button but select your project name from th
 
 ## Conclusion
 
-The BBF pattern is an ideal solution for authentication if you can afford to pay some extra money for having a dedicated backend. It will help you avoid some headches when dealing with access tokens and how to keep them safe on your client side application.
+The BBF pattern is an ideal solution for authentication if you can afford to pay some extra money for having a dedicated backend. It will help you avoid some headches when dealing with access tokens and how to keep them safe on your client side application. The backend will do all the heavy lifting, so you can focus only on UI/UX concerns in the frontend. 
