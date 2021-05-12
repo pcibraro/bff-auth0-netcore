@@ -18,13 +18,13 @@ This pattern does  work for a pure SPA that relies on calling external APIs dire
 
 ## Backend As FrontEnd in .NET 5.0
 
-Visual Studio ships with three templates SPAs with a .NET Core backend. Those are ASP.NET Core with Angular, ASP.NET Core with React.js and ASP.NET Core with React.js and Redux, which includes all the necessary plumbing for using Redux.
+Visual Studio ships with three templates for SPAs with a .NET Core backend. Those are ASP.NET Core with Angular, ASP.NET Core with React.js and ASP.NET Core with React.js and Redux, which includes all the necessary plumbing for using Redux.
 
 > Available templates for SPA and .NET Core
 
 ![alt](./images/1_visualstudio_templates.png)
 
-As part of this article, we will be using how to implement this pattern with the ASP.NET Core with React.js template.
+As part of this article, we will be discussing how to implement this pattern with the ASP.NET Core with React.js template.
 
 ### The structure of the project
 
@@ -37,7 +37,7 @@ Projects created with that template from Visual Studio will have the following s
 - Pages, this folder contains server side pages, which are mostly used for rendering errors on the backend.
 - Startups.cs, this is the main class where the ASP.NET Core Middleware classes are configured as well as the dependency injection container.
 
-Before modifying any code, we will proceed to configure first our application in Auth0, which will give us access to the keys and authentication endpoints for the OpenID middleware in .NET Core.
+Before modifying any code, we will proceed to configure first our application in Auth0. That configuration will give us access to the keys and authentication endpoints for the OpenID middleware in .NET Core.
 
 ### Auth0 Configuration
 
@@ -48,7 +48,7 @@ Go to your Auth0 dashboard, click on the *Applications* menu on the left and the
 
 ![alt](./images/3_applications.png)
 
-The *Create Application* button will start a wizard to define the configuration of a our application. Pick a name for your web application, and select the option *Regular Web Applications*. Do not confuse your application with Single Page Web Applications. Even we are going to implement an SPA with React, we will rely on the .NET Core Backend for negotiating access tokens. When choosing *Regular Web Applications*, we are telling Auth0 that our application will use the Authorization Code Flow that requires a backend channel to receive the initial access code for OpenID Connect, and that is exactly what we need to get that magic happening in our .NET Core backend.
+The *Create Application* button will start a wizard to define the configuration of a our application. Pick a name for your web application, and select the option *Regular Web Applications*. Do not confuse your application with Single Page Web Applications. Even we are going to implement an SPA with React, we will rely on the .NET Core Backend for negotiating the ID tokens. When choosing *Regular Web Applications*, we are telling Auth0 that our application will use the Authorization Code Flow that requires a backend channel to receive the ID token for OpenID Connect, and that is exactly what we need to get that magic happening in our .NET Core backend.
 
  ![alt](./images/4_create_applications.png)
 
@@ -64,16 +64,16 @@ Those are the ones you will need to configure the OpenID middleware in the web a
 
 #### Configure the Callback URL
 
-Next thing is to configure the Callback URL for our web application. This is the URL where Auth0 will post the initial access code for OpenID connect. 
+Next thing is to configure the Callback URL for our web application. This is the URL where Auth0 will post the authentication code and ID token for OpenID connect. 
 This URL can be added in the Allowed URLs field for our application. For our sample, we will use https://localhost:5001/callback. If you are planning to deploy the application to a different URL, you will also need to ensure it is listed here.
 
 #### Configure the Logout URL
 
-The logout URL is where Auth0 will redirect the user after the logout handshake has been completed.  Our web application will pass this URL to Auth0 as part of the *returnTo* query string parameter. This URL must also listed under return to after the user has been logged out of the authorization server. This is specified in the returnTo query parameter. The logout URL for your app must be added to the Allowed Logout URLs field under the application settings, or Auth0 will return an error otherwise when the user tries to do a logout. For our sample, we will use https://localhost:5001.
+The logout URL is where Auth0 will redirect the user after the logout process has been completed.  Our web application will pass this URL to Auth0 as part of the *returnTo* query string parameter. This URL must also listed under return to after the user has been logged out of the authorization server. This is specified in the returnTo query parameter. The logout URL for your app must be added to the Allowed Logout URLs field under the application settings, or Auth0 will return an error otherwise when the user tries to do a logout. For our sample, we will use https://localhost:5001.
 
 ### Configuring the .NET Core Web Application
 
-Our application will use two middleware, the OpenID Connect Middleware for handling all the authentication handshake with Auth0 and the Authentication Cookie middleware for persisting the authentication session across requests and also sharing it with the Frontend running React.
+Our application will use two middleware, the OpenID Connect Middleware for handling all the authentication handshake with Auth0 and the Authentication Cookie middleware for persisting the authentication session in a cookie also sharing it with the Frontend running React.
 
 Open the Package Manager Console for Nuget in Visual Studio and run the following command
 
@@ -82,7 +82,7 @@ Install-Package Microsoft.AspNetCore.Authentication.Cookies
 Install-Package Microsoft.AspNetCore.Authentication.OpenIdConnect
 ```
 
-Once the Nuget packages are installed in our project, we can go ahead and configure them in the Startup.cs class.
+Once the Nuget packages are installed in our project, we can go ahead and configure the middleware in the Startup.cs class.
 
 Modify the ConfigureServices method in that class to include the following code.
 
@@ -234,7 +234,7 @@ public ActionResult Logout()
 }
 ```
 
-It returns a SignOutResult that will log the user out of the application and also initiate the sign out handshake with Auth0. As it happened with the ChallengeResult, this SignOutResult is also a built-in result that the Authentication middleware will process. We also decorated the action with the [Authorize] attribute as it should only be invoked if the user is authenticated. 
+It returns a SignOutResult that will log the user out of the application and also initiate the sign out process with Auth0. As it happened with the ChallengeResult, this SignOutResult is also a built-in result that the Authentication middleware will process. We also decorated the action with the [Authorize] attribute as it should only be invoked if the user is authenticated. 
 
 Finally, the GetUser API code is the following.
 
@@ -270,7 +270,7 @@ public class WeatherForecastController : ControllerBase
 
 ### Securing the React application
 
-So far we have added all the plumbing code on the backend to enable authentication with Auth0 using OpenID Connect. The backend handles the authentication handshake and configures an authentication cookie that we can share with the React app. We also added a *GetUser* API that can be used to determine whether the user is authenticated and get basic identity information about him/her.
+So far we have added all the plumbing code on the backend to enable authentication with Auth0 using OpenID Connect. The backend handles user authentication and configures a cookie that we can share with the React app. We also added a *GetUser* API that can be used to determine whether the user is authenticated and get basic identity information about him/her.
 
 #### React Context for Authentication
 
@@ -411,9 +411,9 @@ return (
 
 #### Add a Component to show user data
 
-The Auth Context provides a getUser function in case you want to show user's basic data coming from Auth0 on the React application. That function returns a collection of claims about the user's identity that is coming from the backend API *getUser*. 
+The Auth Context provides a getUser function in case you want to show user's basic data coming from Auth0 on the React application. That function returns a collection of claims about the user's identity, which is coming from the backend API *getUser*. 
 
-The following code shows a component that enumerates all the claims in the user's identity.
+The following code shows a component that enumerates those claims.
 
 ```javascript
 import React, { useEffect, useState } from 'react';
