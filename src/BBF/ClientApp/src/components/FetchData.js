@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
+import { securefetch } from '../utils/securefetch'
 
 export const FetchData = () => {
     const [forecasts, setForecasts] = useState([]);
     const [loading, setLoading] = useState(true);
 
     const fetchWeather = async () => {
-        const response = await fetch('weatherforecast');
+        
+        const response = await securefetch('weatherforecast');
         const json = await response.json();
 
         setForecasts(json);

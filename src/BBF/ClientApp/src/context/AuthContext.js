@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect, useContext } from "react";
+import { securefetch } from '../utils/securefetch'
 
 export const AuthContext = React.createContext();
 export const useAuth = () => useContext(AuthContext);
@@ -10,7 +11,7 @@ export const AuthProvider = ({
     const [isLoading, setIsLoading] = useState(false);
 
     const getUser = async () => {
-        const response = await fetch('/auth/getUser');
+        const response = await securefetch('/auth/getUser');
         const json = await response.json();
 
         setIsAuthenticated(json.isAuthenticated);
