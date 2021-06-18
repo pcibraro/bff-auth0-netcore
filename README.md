@@ -89,16 +89,24 @@ Modify the ConfigureServices method in that class to include the following code.
 ```c#
 public void ConfigureServices(IServiceCollection services)
 {
-  services.AddAuthentication(options => {
-    options.DefaultAuthenticateScheme = 
-       CookieAuthenticationDefaults.AuthenticationScheme;
-    options.DefaultSignInScheme = 
-       CookieAuthenticationDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = 
-       CookieAuthenticationDefaults.AuthenticationScheme;
-  })
-  .AddCookie()
-  .AddOpenIdConnect("Auth0", options => {
+  services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+    })
+    .AddCookie(o =>
+    {
+        o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        o.Cookie.SameSite = SameSiteMode.Strict;
+        o.Cookie.HttpOnly = true;
+    })
+    .AddOpenIdConnect("Auth0", options => ConfigureOpenIdConnect(options));
+   ....
+ }
+
+private void ConfigureOpenIdConnect(OpenIdConnectOptions options)
+{
     // Set the authority to your Auth0 domain
     options.Authority = $"https://{Configuration["Auth0:Domain"]}";
 
@@ -107,56 +115,123 @@ public void ConfigureServices(IServiceCollection services)
     options.ClientSecret = Configuration["Auth0:ClientSecret"];
 
     // Set response type to code
-    options.ResponseType = OpenIdConnectResponseType.Code;
+    options.ResponseType = OpenIdConnectResponseType.CodeIdToken;
+
+    options.ResponseMode = OpenIdConnectResponseMode.FormPost;
 
     // Configure the scope
     options.Scope.Clear();
     options.Scope.Add("openid");
-
-    // Set the callback path, so Auth0 will call back to http://localhost:5001/callback
+    options.Scope.Add("offline_access");
+    options.Scope.Add("read:weather");
+    
+    // Set the callback path, so Auth0 will call back to http://localhost:3000/callback
     // Also ensure that you have added the URL as an Allowed Callback URL in your Auth0 dashboard
     options.CallbackPath = new PathString("/callback");
 
     // Configure the Claims Issuer to be Auth0
-     options.ClaimsIssuer = "Auth0";
+    options.ClaimsIssuer = "Auth0";
 
-     options.Events = new OpenIdConnectEvents
-     {
-       // handle the logout redirection
-       OnRedirectToIdentityProviderForSignOut = (context) =>
-       {
-          var logoutUri = $"https://{Configuration["Auth0:Domain"]}/v2/logout?client_id={Configuration["Auth0:ClientId"]}";
+    options.SaveTokens = true;
+    
+    options.Events = new OpenIdConnectEvents
+    {
+        // handle the logout redirection
+        OnRedirectToIdentityProviderForSignOut = (context) =>
+        {
+            var logoutUri = $"https://{Configuration["Auth0:Domain"]}/v2/logout?client_id={Configuration["Auth0:ClientId"]}";
 
-          var postLogoutUri = context.Properties.RedirectUri;
-          if (!string.IsNullOrEmpty(postLogoutUri))
-          {
-              if (postLogoutUri.StartsWith("/"))
-              {
-                // transform to absolute
-                var request = context.Request;
-                postLogoutUri = request.Scheme + "://" + request.Host + request.PathBase + postLogoutUri;
-               }
-               logoutUri += $"&returnTo={ Uri.EscapeDataString(postLogoutUri)}";
-           }
-
-           context.Response.Redirect(logoutUri);
-           context.HandleResponse();
-
-           return Task.CompletedTask;
-                    }
-                };
-            });
-
-            services.AddControllersWithViews();
-
-            // In production, the React files will be served from this directory
-            services.AddSpaStaticFiles(configuration =>
+            var postLogoutUri = context.Properties.RedirectUri;
+            if (!string.IsNullOrEmpty(postLogoutUri))
             {
-                configuration.RootPath = "ClientApp/build";
-            });
- }
+                if (postLogoutUri.StartsWith("/"))
+                {
+                    // transform to absolute
+                    var request = context.Request;
+                    postLogoutUri = request.Scheme + "://" + request.Host + request.PathBase + postLogoutUri;
+                }
+                logoutUri += $"&returnTo={ Uri.EscapeDataString(postLogoutUri)}";
+            }
+            context.Response.Redirect(logoutUri);
+            context.HandleResponse();
+
+            return Task.CompletedTask;
+        },
+        OnRedirectToIdentityProvider = context => {
+            context.ProtocolMessage.SetParameter("audience", Configuration["Auth0:ApiAudience"]);
+            return Task.CompletedTask;
+        },
+        OnTokenValidated = (context) => 
+        {
+            InjectCSRFTokenCookie(context.Response);
+            return Task.CompletedTask;
+        }
+    };
+}
 ```
-All this code might look complex at first glance, but the only thing it does is to configure the OpenID Middleware to point to Auth0 and persist the authentication session in cookies. It also relies on some settings that we will configure later in the appSettings.json file associated to the application.
+
+This code configures the OpenID Connect Middleware to point to Auth0 for authentication, and the Cookie Middleware for persisting the authentication session in cookies. Let's discuss different parts of this code more in detail so you can understand what it does.
+
+```csharp
+services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+    })
+    .AddCookie(o =>
+    {
+        o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        o.Cookie.SameSite = SameSiteMode.Strict;
+        o.Cookie.HttpOnly = true;
+    })
+```
+
+It configures authentication to rely on the session cookie as primary authentication mechanism if no other is specified in one of the controllers of the web application. It also injects the cookie middleware with a few settings that restrict how the cookie can be used on the browsers. The cookie can only be used under https (CookieSecurePolicy.Always), it's not available client side (HttpOnly = true) and uses a site policy equals to strict (SameSiteMode.Strict). This last one implies the cookie will only be sent if the domain for the cookie matches exactly the domain in the browser's url. All these settings help preventing potential attacks with scripting on the client side.
+
+```csharp
+options.ResponseType = OpenIdConnectResponseType.CodeIdToken;
+
+options.ResponseMode = OpenIdConnectResponseMode.FormPost;
+
+```
+
+The OpenID Connect Middleware is configured to use ResponseType equals to CodeIdToken (Hybrid flow), which means the Authorization endpoint in our web application will receive an authorization code and id token right after the user is authenticated. We will use the authorization code in exchange for an access token for calling a backend api hosted in a different site. 
+
+```csharp
+// Configure the scope
+options.Scope.Clear();
+options.Scope.Add("openid");
+options.Scope.Add("offline_access");
+options.Scope.Add("read:weather");
+```
+
+The *openid* scope is required as part of the OpenID Connect authentication flow. The *offline_access* is for requesting a refresh token, and *read:weather* is specific to the API we will call later as part of this sample. 
+
+```csharp
+options.SaveTokens = true;
+```
+
+This option tells the OpenID Connect Middleware that all the tokens (id token, refresh token and authorization call) received in the Authorization endpoint during the initial handshake must be persisted for later use. By default, the middleware persists those tokens in the encrypted session cookie, and we will use that for our sample.
+
+```csharp
+OnRedirectToIdentityProvider = context => {
+    context.ProtocolMessage.SetParameter("audience", Configuration["Auth0:ApiAudience"]);
+    return Task.CompletedTask;
+},
+```
+
+The OpenID Connect Middleware does not have any property to configure the *audience* parameter that Auth0 requires for returning an authorization code for an API. We are attaching code to the *OnRedirectToIdentityProvider* event for setting that parameter before the user is redirected to Auth0 for authentication.
+
+```csharp
+OnTokenValidated = (context) => 
+{
+    InjectCSRFTokenCookie(context.Response);
+    return Task.CompletedTask;
+}
+```
+
+This is a nice to have feature but not something required for getting this sample working. We will show later how to configure a cookie for preventing CSRF attacks on our session cookie.
 
 Next step is to modify the Configure method to tell ASP.NET Core that we want to use the Authentication And Authorization Middleware. Those middleware will integrate automatically with the authentication session cookies.
 
@@ -182,7 +257,7 @@ app.UseEndpoints(endpoints =>
 }
 ```
 
-Create a new appSettings.json file and include the settings we got from the Auth0 dashboard before. Those are *Domain*, *Client ID* and *Client Secret*.
+Create a new appSettings.json file and include the settings we got from the Auth0 dashboard before. Those are *Domain*, *Client ID*, *Client Secret* and *ApiAudience*.
 
 ```javascript
 {
@@ -197,7 +272,8 @@ Create a new appSettings.json file and include the settings we got from the Auth
   "Auth0": {
     "Domain": "<domain>",
     "ClientId": "<client id>",
-    "ClientSecret": "<client secret>"
+    "ClientSecret": "<client secret>",
+    "ApiAudience": "https://weatherforecast"
   }
 }
 ```
@@ -267,6 +343,230 @@ The WeatherForecast controller included in the template allows anonymous calls. 
 public class WeatherForecastController : ControllerBase
 {
 ```
+
+### Negotiate an Access Token and call a remote API
+
+We will convert the WeatherForecast controller in our web application to act as reverse proxy and call the equivalent API hosted remotelly in a different site. This API will require an access token, so the controller will have to negotiate first with the authorization code that is persisted in the session cookie.
+
+```csharp
+[HttpGet]
+[CSFToken]
+public async Task Get()
+{
+    var accessToken = await HttpContext.GetTokenAsync("Auth0", "access_token");
+
+    var httpClient = _httpClientFactory.CreateClient();
+
+    var request = new HttpRequestMessage(HttpMethod.Get, new Uri(_apiEndpoint, "WeatherForecast"));
+    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+    var response = await httpClient.SendAsync(request);
+
+    response.EnsureSuccessStatusCode();
+
+    await response.Content.CopyToAsync(HttpContext.Response.Body);
+}
+```
+
+The trick for getting the access token is in the following line,
+
+```cshap
+var accessToken = await HttpContext.GetTokenAsync("Auth0", "access_token");
+```
+
+GetTokenAsync is an extension method available as part of the Authentication middleware in ASP.NET Core. The first argument specifies the middleware to be used to get the token, which is our OpenID Connect Middleware configured with the name **Auth0**, and the second argument is token to be used. In the case of OpenID Connect, the possible values are **access_token** or **id_token**. If the access token is not available, the Middleware will use the refresh token and authorization code to get one. Since our middleware was pointing to the Weather api with the audience attribute and the scope we previously configured, Auth0 will return an access token for that API.
+
+```csharp
+var httpClient = _httpClientFactory.CreateClient();
+
+var request = new HttpRequestMessage(HttpMethod.Get, new Uri(_apiEndpoint, "WeatherForecast"));
+request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+var response = await httpClient.SendAsync(request);
+
+response.EnsureSuccessStatusCode();
+
+await response.Content.CopyToAsync(HttpContext.Response.Body);
+```
+
+The code above forwards the request to the remote API using a new instance of HttpClient, and passing the access token as a Bearer token in the authorization header.
+
+## Configuring the remote API
+
+For this API, we will use the one included as template with Visual Studio for .NET Core that returns the weather forecast.
+
+### Creating an API in Auth0
+
+First step before jumping into the implementation is to configure the API in the Auth0 dashboard. 
+
+Go the APIs and click on Create API
+
+![alt](./images/7-create-api.png)
+
+Under the settings tab, configure the following fields.
+
+* **Name**, a friendly name or description for the API. Enter **Weather Forecast API** for this sample.
+* **Identifier** or **Audience**, which is a identifier that client application uses to request access tokens for the API. Enter **https://weatherforecast**.
+
+Under the permissions tab, add a new permission **read-weather** with a description **It allows getting the weather forecast**. This is the scope that Auth0 will inject in the access token if the user approves it in the conscent screen. 
+  
+Finally, click on the Save button to save the changes. At this point, our API is ready to be used from .NET Core.
+
+### Create the ASP.NET Core API in Visual Studio
+
+Visual Studio ships with a single template for .NET Core APIs. That is **ASP.NET Core Web API** as it is shown in the image below.
+
+![alt](./images/8-visual-studio-template.png)
+
+#### The structure of the project
+
+Projects created with that template from Visual Studio will have the following structure.
+
+![alt](./images/9-project.png)
+
+- Controllers, this folder contains the controllers for the API implementation.
+- Startups.cs, this is the main class where the ASP.NET Core Middleware classes are configured as well as the dependency injection container.
+ 
+#### Configuring the project
+
+Our application will only use a middleware for supporting authentication with JWT as bearer tokens.
+
+Open the Package Manager Console for Nuget in Visual Studio and run the following command.
+
+```
+Install-Package Microsoft.AspNetCore.Authentication.JwtBearer
+```
+
+Once the Nuget packages are installed in our project, we can go ahead and configure them in the Startup.cs class.
+
+Modify the ConfigureServices method in that class to include the following code.
+
+```csharp
+public void ConfigureServices(IServiceCollection services)
+{
+    var authentication = services
+        .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer("Bearer", c =>
+        {
+        c.Authority = $"https://{Configuration["Auth0:Domain"]}";
+        c.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateAudience = true,
+            ValidAudiences = Configuration["Auth0:Audience"].Split(";"),
+            ValidateIssuer = true,
+            ValidIssuer = $"https://{Configuration["Auth0:Domain"]}";
+        };
+    });
+
+    services.AddControllers();
+            
+    services.AddSwaggerGen(c =>
+    {
+        c.SwaggerDoc("v1", new OpenApiInfo { Title = "Api", Version = "v1" });
+    });
+
+    services.AddAuthorization(o =>
+    {
+        o.AddPolicy("read:weather", p => p.
+            RequireAuthenticatedUser().
+            RequireScope("read:weather"));
+    });
+}
+```
+This code performs two things. It configures the JWT middleware to accept access tokens issued by Auth0, and an authorization policy for checking the scope set on the token. 
+The policy checks for a claim or attribute called **scope** with a value **read:weather**, which is the scope we previously configured for our API in the Auth0 dashboard.
+
+Next step is to modify the Configure method to tell ASP.NET Core that we want to use the Authentication And Authorization Middleware. 
+
+Insert the following code as it shown below.
+
+```
+public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+{
+...
+  app.UseRouting();
+            
+  app.UseAuthentication();
+
+  app.UseAuthorization();
+
+...
+  app.UseEndpoints(endpoints =>
+  {
+    endpoints.MapControllers();
+  });
+}
+```
+
+Create a new appSettings.json file and include the settings we got from the Auth0 dashboard before. Those are Domain, and API's Audience.
+
+```
+{
+  "Logging": {
+      "LogLevel": {
+      "Default": "Information",
+      "Microsoft": "Warning",
+      "Microsoft.Hosting.Lifetime": "Information"
+      }
+    },
+  "AllowedHosts": "*",
+  "Auth0": {
+    "Domain": "<domain>",
+    "Audience": "https://weatherforecast"
+  }
+}
+```
+
+#### RequireScope policy
+
+ASP.NET Core does not include any policy out of the box for checking an individual scope in a JWT Access Token. 
+
+```cshap
+public class ScopeHandler :
+             AuthorizationHandler<ScopeRequirement>
+{
+    protected override Task HandleRequirementAsync(
+        AuthorizationHandlerContext context,
+        ScopeRequirement requirement)
+    {
+        if (context is null)
+        {
+            throw new ArgumentNullException(nameof(context));
+        }
+
+        var success = context.User.Claims.Any(c => c.Type == "scope" && 
+            c.Value.Contains(requirement.Scope));
+
+        if (success)
+            context.Succeed(requirement);
+        
+        return Task.CompletedTask;
+    }
+}
+```
+
+The authentication middleware parses the JWT Access Token and converts each attribute in the token as a claim that gets attached to the current user in context. Our policy handler uses the claim associated to the **scope** for checking that the expected scope is there (read:weather).
+
+#### Require authentication in the API controller
+The WeatherForecast controller included in the template allows anonymous calls. We will convert it to require authenticated calls using the *[Authorize]* attribute. That attribute will also reference the policy we previously defined in the Startup.cs file.
+
+```csharp
+[ApiController]
+[Route("[controller]")]
+public class WeatherForecastController : ControllerBase
+{
+  [HttpGet]
+  [Authorize("read:weather")]
+  public IEnumerable<WeatherForecast> Get()
+  {
+```
+
+This attribute will do two things,
+
+- It will activate the Authorization Middleware that will check if the call was authenticated and there is one user identity set in the current execution context.
+- It will run the **read-weather** policy to make sure the user identity contains the required permissions. In our case, it will check the access token contains an scope called **read:weather**.
+
+Once we ran this project in Visual Studio, the API will only accept authenticated calls with JWT tokens coming from Auth0.
 
 ### Securing the React application
 
@@ -474,6 +774,94 @@ From Visual Studio, click on the Run button but select your project name from th
 - The OIDC middleware returns a successful authentication response and a cookie which indicates that the user is authenticated. The cookie contains claims with the user's information. The cookie is stored, so that the cookie middleware will automatically authenticate the user on any future requests. The OIDC middleware receives no more requests, unless it is explicitly challenged
 - The React application uses the Auth Context to issue an API call to the getUser API. This API returns the user claims from the authentication cookie
 - The React application renders the UI Component using the authenticated user's identity.
+
+### Adding additional protection for CSRF Attacks
+
+We all know that authentication cookies are prone to Cross-site Forgery Attacks or CSRF in short. Our example includes a basic implementation of a pattern called [Cookie-to-header token](https://en.wikipedia.org/wiki/Cross-site_request_forgery#Cookie-to-header_token) to prevent this kind of attack. This pattern uses a session cookie that is configured with a value, and javascript that reads that cookie and sends the value as a custom HTTP Header (X-CSRF-Token). Any request comming from the client app will have to include both, the header (set by Javascript) and the cookie (set by the browser). Some code in our Backend will check that the value in the X-CSRF-Token matches the value in the cookie. The premise is that only javascript running in the same domain would have access to the cookie. This pattern will prevent any javascript running in a different domains or even fake links to make an authenticated call to our backend.
+
+If you remember how we configure the OpenID Middleware, the OnTokenValidated event had the following code.
+
+```csharp
+OnTokenValidated = (context) => 
+{
+    InjectCSRFTokenCookie(context.Response);
+    return Task.CompletedTask;
+}
+```
+
+That code runs only once when the id token coming from Auth0 is initialized validated. We used that event to inject our cookie with the CSRF Token.
+
+```csharp
+private void InjectCSRFTokenCookie(HttpResponse response)
+{
+    var token = Guid.NewGuid().ToString("N");
+    
+    response.Cookies.Append("X-CSRF-Token", token, new CookieOptions
+    {
+        HttpOnly = false,
+        SameSite = SameSiteMode.Strict,
+        Secure = true
+    });
+}
+```
+
+The cookie just contains a simple random GUID value, and it was configured with the same security settings as our authentication cookie. Knowing that the client app will include a custom header in each call to our backend, we can implement some code for checking that in a custom filter that we associate to the controllers.
+
+```csharp
+public class CSFToken : ActionFilterAttribute
+{
+    public override void OnActionExecuting(ActionExecutingContext context)
+    {
+        if (context.HttpContext.User.Identity.IsAuthenticated)
+        {
+            var header = context.HttpContext.Request.Headers["X-CSRF-Token"];
+            var cookie = context.HttpContext.Request.Cookies["X-CSRF-Token"];
+
+            if (header != cookie)
+            {
+                context.Result = new UnauthorizedResult();
+
+                return;
+            }
+        }
+        
+        base.OnActionExecuting(context);
+    }
+}
+```
+
+The implementation is pretty straighforward. It only checks the value set in the cookie matches the one in the custom header.
+
+### Sending the CSRF Token on the client side
+
+The client application should parse the cookie and include it as a header on each call to the backend.  We can write a function for doing that.
+
+```javascript
+export const securefetch = (url, options) => {
+    const token = document.cookie.replace(/(?:(?:^|.*;\s*)X-CSRF-Token\s*\=\s*([^;]*).*$)|^.*$/, "$1");
+
+    const headers = { "X-CSRF-Token": token };
+
+    options = options || {};
+
+    options.headers = { ...options.headers, ...headers };
+        
+    return fetch(url, options);
+};
+```
+
+We can later reference this securefetch function from our React components
+
+```javascript
+const fetchWeather = async () => {
+        
+    const response = await securefetch('weatherforecast');
+    const json = await response.json();
+
+    setForecasts(json);
+    setLoading(false);
+}
+```
 
 ## Conclusion
 
