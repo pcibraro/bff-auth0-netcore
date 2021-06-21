@@ -196,7 +196,7 @@ options.ResponseMode = OpenIdConnectResponseMode.FormPost;
 
 ```
 
-The OpenID Connect Middleware is configured to use ResponseType equals to CodeIdToken (Hybrid flow), which means the Authorization endpoint in our web application will receive an authorization code and id token right after the user is authenticated. We will use the authorization code in exchange for an access token for calling a backend api hosted in a different site. 
+The OpenID Connect Middleware is configured to use ResponseType equals to CodeIdToken (Hybrid flow), which means our web application will receive an authorization code and id token directly from the Authorization endpoint right after the user is authenticated. We will use the authorization code in exchange for an access token for calling a backend api hosted in a different site. 
 
 ```csharp
 // Configure the scope
@@ -564,7 +564,7 @@ public class WeatherForecastController : ControllerBase
 This attribute will do two things,
 
 - It will activate the Authorization Middleware that will check if the call was authenticated and there is one user identity set in the current execution context.
-- It will run the **read-weather** policy to make sure the user identity contains the required permissions. In our case, it will check the access token contains an scope called **read:weather**.
+- It will run the **read:weather** policy to make sure the user identity contains the required permissions. In our case, it will check the access token contains an scope called **read:weather**.
 
 Once we ran this project in Visual Studio, the API will only accept authenticated calls with JWT tokens coming from Auth0.
 
