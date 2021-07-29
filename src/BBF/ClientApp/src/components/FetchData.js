@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { securefetch } from '../utils/securefetch'
 
 export const FetchData = () => {
     const [forecasts, setForecasts] = useState([]);
@@ -7,7 +6,7 @@ export const FetchData = () => {
 
     const fetchWeather = async () => {
         
-        const response = await securefetch('weatherforecast');
+        const response = await fetch('weatherforecast');
         const json = await response.json();
 
         setForecasts(json);

@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using System.Net.Http;
 using Microsoft.Extensions.Configuration;
 using System.Net.Http.Headers;
-using BackendAsFrontend.Authorization;
 
 namespace BackendAsFrontend.Controllers
 {
@@ -36,7 +35,6 @@ namespace BackendAsFrontend.Controllers
         }
 
         [HttpGet]
-        [CSFToken]
         public async Task Get()
         {
             var accessToken = await HttpContext.GetTokenAsync("Auth0", "access_token");

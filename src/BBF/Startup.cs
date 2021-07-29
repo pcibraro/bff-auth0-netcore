@@ -148,25 +148,8 @@ namespace BackendAsFrontend
                 OnRedirectToIdentityProvider = context => {
                     context.ProtocolMessage.SetParameter("audience", Configuration["Auth0:ApiAudience"]);
                     return Task.CompletedTask;
-                },
-                OnTokenValidated = (context) => 
-                {
-                    InjectCSRFTokenCookie(context.Response);
-                    return Task.CompletedTask;
                 }
             };
-        }
-
-        private void InjectCSRFTokenCookie(HttpResponse response)
-        {
-            var token = Guid.NewGuid().ToString("N");
-            
-            response.Cookies.Append("X-CSRF-Token", token, new CookieOptions
-            {
-                HttpOnly = false,
-                SameSite = SameSiteMode.Strict,
-                Secure = true
-            });
         }
     }
 }
