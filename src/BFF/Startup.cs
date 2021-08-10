@@ -12,7 +12,7 @@ using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using System;
 using System.Threading.Tasks;
 
-namespace BackendAsFrontend
+namespace BackendForFrontend
 {
     public class Startup
     {

@@ -10,7 +10,7 @@ using System.Net.Http;
 using Microsoft.Extensions.Configuration;
 using System.Net.Http.Headers;
 
-namespace BackendAsFrontend.Controllers
+namespace BackendForFrontend.Controllers
 {
     [ApiController]
     [Authorize]

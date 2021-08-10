@@ -7,7 +7,7 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
-namespace BackendAsFrontend.Controllers
+namespace BackendForFrontend.Controllers
 {
     public class AuthController : Controller
     {
