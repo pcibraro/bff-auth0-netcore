@@ -17,15 +17,13 @@ namespace BackendForFrontend.Controllers
     [Route("[controller]")]
     public class WeatherForecastController : ControllerBase
     {
-        private readonly ILogger<WeatherForecastController> _logger;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly Uri _apiEndpoint;
 
-        public WeatherForecastController(ILogger<WeatherForecastController> logger, 
+        public WeatherForecastController(
             IHttpClientFactory httpClientFactory,
             IConfiguration configuration)
         {
-            _logger = logger;
             _httpClientFactory = httpClientFactory;
 
             if (configuration["WeatherApiEndpoint"] == null)
