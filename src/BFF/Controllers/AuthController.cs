@@ -18,8 +18,10 @@ namespace BackendForFrontend.Controllers
         }
 
         [Authorize]
-        public ActionResult Logout()
+        public async Task<ActionResult> Logout()
         {
+            await HttpContext.SignOutAsync();
+
             return new SignOutResult("Auth0", new AuthenticationProperties
             {
                 RedirectUri = Url.Action("Index", "Home")
